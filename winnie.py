@@ -45,8 +45,6 @@ ch.setLevel(logging.INFO)
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
-
-#catch all the information about input and output files as well as information on the used tool (fimo or moods)
 def parse_args():
 	
 	parser = argparse.ArgumentParser(prog = 'winnie', description = textwrap.dedent('''                           
@@ -122,7 +120,7 @@ def read_pfm(motifs, output_directory):
 						written_file.close()
 
 					motif_alternate_name = check_name(re.split(' ', line)[1].rstrip())
-					motif_id = re.split(' ', line[1:])[0] #[1:] meands do not use the first character
+					motif_id = re.split(' ', line[1:])[0] #[1:] means do not use the first character
 					motif_name = os.path.join(output_directory, motif_alternate_name + '_' + motif_id + '.pfm')
 							
 					splitted_motifs.append(motif_name)
@@ -213,7 +211,7 @@ def call_moods(one_motif, genome, output_directory, p_value, moods_bg, fisher_di
 	#check if this is a bigwig file
 	bw_control = pyBigWig.open(control)
 	bw_overexpression = pyBigWig.open(overexpression)
-	if not bw_control.isBigWig() or not bw_overexpression.isBigWig(): # <---------------- if the function to make random score stays, delete this if!!!
+	if not bw_control.isBigWig() or not bw_overexpression.isBigWig():
 		logger.info("please provide the bigwig file!")
 		sys.exit()
 	else:
@@ -274,13 +272,6 @@ def call_moods(one_motif, genome, output_directory, p_value, moods_bg, fisher_di
 					chromosom = header_splitted[0]
 					positions = re.split(r'-', header_splitted[-1])
 
-					#compute the background difference for this peak
-					#bw_global_score_control = np.mean(np.nan_to_num(np.array(list(bw_control.values(chromosom, int(positions[0]), int(positions[1]))))))
-					#bw_global_score_overexpression = np.mean(np.nan_to_num(np.array(list(bw_overexpression.values(chromosom, int(positions[0]), int(positions[1]))))))
-					#
-					#bw_global_difference = bw_global_score_control - bw_global_score_overexpression
-					#print(bw_global_difference)
-
 					results = scanner.scan(seq)
 
 					fr = results[:len(matrix_names)] #forward strand
@@ -312,13 +303,6 @@ def call_moods(one_motif, genome, output_directory, p_value, moods_bg, fisher_di
 								start = int(positions[0]) + pos + 1
 								end = start + len(hitseq) - 1
 
-							"""# ---------------------------------------delete??-------------------------------
-							if key_for_bed_dict not in scores_dict: #if this peak has no matches yet
-								#fill the peak with 0
-								peak_length = int(positions[1]) - int(positions[0]) + 1
-								scores_dict[key_for_bed_dict] = np.full(peak_length, 0.0)
-							"""#-------------------------------------------------------------------------------
-
 							#find the real start and end positions on the chromosom		
 							real_start = int(positions[0]) + int(start) #start of the peak + start of the motif within the peak, do not add 1, as bigwig is 0-based
 							real_end = real_start + len(hitseq)
@@ -330,40 +314,13 @@ def call_moods(one_motif, genome, output_directory, p_value, moods_bg, fisher_di
 							bw_scores_control = np.mean(np.nan_to_num(np.array(list(bw_control.values(chromosom, real_start, real_end)))))
 							bw_scores_overexpression = np.mean(np.nan_to_num(np.array(list(bw_overexpression.values(chromosom, real_start, real_end)))))
 
-							control_dict = save_bw_score(one_motif, key_for_bed_dict, control_dict, bw_scores_control, hitseq, score)
-							overexpression_dict = save_bw_score(one_motif, key_for_bed_dict, overexpression_dict, bw_scores_overexpression, hitseq, score)
+							control_dict = save_bw_score(key_for_bed_dict, control_dict, bw_scores_control, hitseq, score)
+							overexpression_dict = save_bw_score(key_for_bed_dict, overexpression_dict, bw_scores_overexpression, hitseq, score)
 
 							bw_difference = abs(bw_scores_overexpression - bw_scores_control)
 							
 							if not np.isnan(bw_difference) and bw_difference != 0.0: #do not need to check for nan
 								differences.append(bw_difference)
-
-							"""#--------------------------------------------------delete????------------------------------
-								if not key_for_bed_dict in matches_dict: 
-								# and not start in matches_dict[key_for_bed_dict]: #and float(matches_dict[key_for_bed_dict][start]['difference']) < bw_difference: #if there is no information saved about this match yet and if so, the saved difference is smaller that the one we have just found
-									matches_dict[key_for_bed_dict] = matches_dict.get(key_for_bed_dict, {})
-									matches_dict[key_for_bed_dict][start] = {'moods_score': score, 'hitseq': hitseq, 'difference': bw_difference}
-							"""
-
-							"""
-							for i in range(len(hitseq)):
-								#check for the score, if there is already some score saved on this position, save the greatest (better) score
-								if scores_dict[key_for_bed_dict][int(start) + i] != 0.0:
-									#print(scores_dict[key_for_bed_dict][int(start) + i])
-									scores_dict[key_for_bed_dict][int(start) + i] = max(bw_scores[i], scores_dict[key_for_bed_dict][int(start) + i])
-									#print(scores_dict[key_for_bed_dict][int(start) + i])
-								else:
-									scores_dict[key_for_bed_dict][int(start) + i] = bw_scores[i]
-
-							#if we already have background, use it to make the dictionary for fisher exact test
-							if background_dict:
-								#print(scores_dict[key_for_bed_dict][int(start):int(start) + len(hitseq)])
-								overexpression_mean = np.mean(np.array(scores_dict[key_for_bed_dict][int(start):int(start) + len(hitseq)]))
-								if not np.isnan(overexpression_mean) and overexpression_mean > background_dict[key_for_bed_dict]:
-										motifs_dict[key_for_bed_dict] += 1
-							else:
-								motifs_dict[key_for_bed_dict] += 1
-							"""#-----------------------------------------------------------------------------------------------------
 
 			#one doesnt need to close file that was opened like so, as python does it on itself. file.closed says True			
 			return fisher_dict_bg, fisher_dict, control_dict, overexpression_dict, differences
@@ -371,24 +328,17 @@ def call_moods(one_motif, genome, output_directory, p_value, moods_bg, fisher_di
 			logger.info("The input for moods was not validated by the MOODS.parsers.pfm. Please check if it has the right format (note that the MOODS accepts only the old version of .pfm files, that is one without the header containing the name and id of the motif)")
 			sys.exit()
 
-#check if the bw score is already saved, if so check if it is bigger than the new one <--------------------------- do i need to save motif name in this matrix???
-def save_bw_score(motif, key_for_bed_dict, matches_dict, bw_score, hitseq, score):
+#check if the bw score is already saved, if so check if it is bigger than the new one
+def save_bw_score(key_for_bed_dict, matches_dict, bw_score, hitseq, score):
 
 	if np.isnan(bw_score): bw_score = 0.0
 
-	#bw_score = float(bw_score) * float(score) #apply the moods score
+	#bw_score = float(bw_score) * float(score) #apply the moods score 
 
 	if key_for_bed_dict in matches_dict:
 
-		""" #---------------------------delete or leave as a feature??-----------
-		if float(matches_dict[key_for_bed_dict]['bw_score']) < bw_score: #save the match with the bigger score
-			#print(matches_dict[key_for_bed_dict]['bw_score'])
-			matches_dict[key_for_bed_dict] = {'bw_score': bw_score, 'hitseq': hitseq, 'moods_score': score}
-			#print(matches_dict[key_for_bed_dict]['bw_score'])
-		"""
 		#save the mean of the boths scores
 		#matches_dict[key_for_bed_dict] = np.mean([matches_dict[key_for_bed_dict], bw_score])
-		#----------------------------------------------------------------------
 
 		#save the biggest of scores
 		if matches_dict[key_for_bed_dict] < bw_score:
@@ -467,7 +417,7 @@ def tool_make_output(motif, genome, output_directory, cleans, p_value, bed_dicti
 
 	return my_wilcoxon_pvalue, fisher_dict, direction, differences, motif_std
 
-def make_normal_distribution_plot(input_array, motif_name):
+def make_normal_distribution_plot(input_array, motif_name): # <---------------------------- need to improve due to the false output directory
 	figure_name = motif_name.replace("pfm", "png")
 
 	output_directory = "./plots3"
@@ -484,7 +434,7 @@ def make_normal_distribution_plot(input_array, motif_name):
 	xmin, xmax = plt.xlim()
 	x = np.linspace(xmin, xmax, 100)
 	p = stats.norm.pdf(x, mu, std)
-	plt.plot(x, p, 'r', linewidth = 3)
+	plt.plot(x, p, 'r', linewidth = 1)
 	motif_name = motif_name.replace(".pfm", "")
 	title = motif_name + " fit results: mu = %.4f, std = %.4f" % (mu, std)
 
@@ -544,22 +494,6 @@ def my_wilcoxon(x, y, global_mean, global_std, motif_name, correction = False):
 
 	r_plus = np.sum((d > 0) * r, axis = 0)
 	r_minus = np.sum((d < 0) * r, axis = 0)
-
-	"""
-	#direction towards first array, plus
-	first_array = max(d)
-	#direction towards second array, minus
-	second_array = abs(min(d))
-
-	if first_array > second_array:
-		#x was bigger
-		direction = "first_array"
-	else:
-		#y was bigger
-		direction = "second_array"
-
-	#print(r_plus, r_minus)
-	"""
 
 	T = min(r_plus, r_minus)
 	mn = count * (count + 1.) * 0.25
@@ -788,23 +722,13 @@ def is_fasta(check_fasta):
 
 def check_existing_input_files(args):
 
-	"""
-	cond1 = pyBigWig.open(args.condition1)
-	cond2 = pyBigWig.open(args.condition2)
-
-	elif not cond1.isBigWig() or not cond2.isBigWig():
-		logger.info('please provide bigWig files for the both conditions you want to compare')
-		sys.exit()
-
-	cond1.close()
-	cond2.close()
-	"""
 	if not is_fasta(args.genome):
 		logger.info('please make sure the input genome file has a fasta format')
 		sys.exit()
 	if not os.path.isfile(args.condition1) or not os.path.isfile(args.condition2):
 		logger.info('please make sure the both files with conditions to compare exist')
 		sys.exit()
+	#we will check for appropriative bigWig format later on
 	if not args.condition1.endswith('.bw') or not args.condition2.endswith('.bw'):
 		logger.info('please check if the both conditions files are in bigWig format')
 		sys.exit()
@@ -839,16 +763,6 @@ def make_bed_dictionary(bed_file):
 	read_bed_file.close()
 
 	return bed_dictionary
-
-def print_small_logo():
-	winnie_logo = """\
-	 __      ___ _  _ _  _ _     
-	 \ \    / (_) \| | \| (_)___ 
-	  \ \/\/ /| | .` | .` | / -_)
-	   \_/\_/ |_|_|\_|_|\_|_\___|
-	                             
-	"""
-	logger.info(winnie_logo)
 
 def print_big_logo():
 	winnie_big_logo = """\
