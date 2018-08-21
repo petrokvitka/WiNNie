@@ -1,0 +1,7 @@
+# 0-order Markov frequencies from file hg19.fasta
+# seqs: 25    min: 16571    max: 249250621    avg: 123827759.3    sum: 3095693983    alph: DNA
+# order 0
+A 2.955e-01
+C 2.045e-01
+G 2.045e-01
+T 2.955e-01
