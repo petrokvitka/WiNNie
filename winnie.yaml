@@ -1,0 +1,16 @@
+name: winnie
+
+channels:
+  - bioconda
+  - conda-forge
+
+dependencies:
+  - snakemake
+  - meme
+  - moods
+  - biopython
+  - pybedtools
+  - matplotlib
+  - pybigwig
+  - scipy
+  - statsmodels
