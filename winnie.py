@@ -463,9 +463,9 @@ def tool_make_output(motif, genome, output_directory, cleans, p_value, bed_dicti
 	motif_name = motif_name.replace('/', '')
 
 	#make the wilcoxon signed-rank test
-	my_statistic, my_wilcoxon_pvalue, direction, differences, motif_std = my_wilcoxon(control_array, overexpression_array, global_mean, global_std, motif_name, correction = False)
+	my_wilcoxon_pvalue, direction, differences, differences_normalized, motif_std = my_wilcoxon(bw_control, bw_overexpression, control_array, overexpression_array, global_mean, global_std, motif_name, correction = False)
 
-	return my_wilcoxon_pvalue, fisher_dict, direction, differences, motif_std
+	return my_wilcoxon_pvalue, fisher_dict, direction, differences, differences_normalized, motif_std
 
 def make_normal_distribution_plot(input_array, motif_name):
 	figure_name = motif_name.replace("pfm", "png")
@@ -497,7 +497,7 @@ def make_normal_distribution_plot(input_array, motif_name):
 	#plt.show()
 
 #modified from scipy.wilcoxon
-def my_wilcoxon(x, y, global_mean, global_std, motif_name, correction = False):
+def my_wilcoxon(bw_control, bw_overexpression, x, y, global_mean, global_std, motif_name, correction = False):
 
 	x, y = map(np.asarray, (x, y)) #apply np.asarray to both input arrays
 
@@ -530,20 +530,20 @@ def my_wilcoxon(x, y, global_mean, global_std, motif_name, correction = False):
 	#https://stackoverflow.com/questions/15389768/standard-deviation-of-a-list
 
 	#correct the differences according to the global mean and std
-	d = (d - global_mean) / global_std
+	d_normalized = (d - global_mean) / global_std
 
 	#motif_name = motif_name.replace(".pfm", "_normalized.pfm")
 	#make_normal_distribution_plot(d, motif_name)
 
-	count = len(d)
+	count = len(d_normalized)
 
 	if count < 10:
 		logger.info("The sampe size is too small for normal approximation")
 
-	r = stats.rankdata(abs(d)) #assign ranks to data, dealing with ties appropriately
+	r = stats.rankdata(abs(d_normalized)) #assign ranks to data, dealing with ties appropriately
 
-	r_plus = np.sum((d > 0) * r, axis = 0)
-	r_minus = np.sum((d < 0) * r, axis = 0)
+	r_plus = np.sum((d_normalized > 0) * r, axis = 0)
+	r_minus = np.sum((d_normalized < 0) * r, axis = 0)
 
 	"""
 	#direction towards first array, plus
@@ -575,16 +575,18 @@ def my_wilcoxon(x, y, global_mean, global_std, motif_name, correction = False):
 	correction = 0.5 * int(bool(correction)) * np.sign(T - mn)
 	z = (T - mn - correction) / se
 	#scale down
-	prob = 2. * stats.norm.sf(abs(z), scale = 2.5)
+	prob = 2. * stats.norm.sf(abs(z), scale = 1) #before scale = 2.5 <-----------------------------------------------------
 
-	motif_std = np.std(d, ddof = 1)
-	motif_mu = np.mean(d)
+	motif_std = np.std(d_normalized, ddof = 1)
+	motif_mu = np.mean(d_normalized)
 
-	direction = "control" #first_array
+	#direction = "control" #first_array
+	direction = get_name_from_path(bw_control)
 	if motif_mu < 0:
-		direction = "overexpression" #second_array
+		#direction = "overexpression" #second_array
+		direction = get_name_from_path(bw_overexpression)
 
-	return T, prob, direction, d, motif_std
+	return prob, direction, d, d_normalized, motif_std
 
 def make_name_from_path(full_path, output_directory, ending):
 	return os.path.join(output_directory, get_name_from_path(full_path) + ending)
@@ -608,13 +610,14 @@ def multiprocess(motifs, genome, output_directory, cleans, p_value, bed_dictiona
 	global_mean, global_std = compute_differences(bed_dictionary, condition1, condition2)
 
 	all_differences = []
+	all_differences_normalized = []
 	motifs_p_values = open("test_motifs_p_values11.txt", 'w')
 
 	all_stds = {}
 
 	#first find motifs using standard background
 	for motif in motifs:
-		wilcoxon_p_value, fisher_dict, direction, differences, motif_std = pool.apply_async(tool_make_output, args = (motif, genome, output_directory, cleans, p_value, bed_dictionary, moods_bg, condition1, condition2, global_mean, global_std, )).get()
+		wilcoxon_p_value, fisher_dict, direction, differences, differences_normalized, motif_std = pool.apply_async(tool_make_output, args = (motif, genome, output_directory, cleans, p_value, bed_dictionary, moods_bg, condition1, condition2, global_mean, global_std, )).get()
 
 		motif_name = motif.replace(output_directory, "") #find an elegant way to do it
 		motif_name = motif_name.replace("/", "")
@@ -627,6 +630,7 @@ def multiprocess(motifs, genome, output_directory, cleans, p_value, bed_dictiona
 		#-------------
 		all_stds[motif_name] = motif_std
 		all_differences.extend(differences)
+		all_differences_normalized.extend(differences_normalized)
 		#-------------
 		print(motif_name, wilcoxon_p_value, direction)
 		motifs_p_values.write('\t'.join([str(motif_name), str(wilcoxon_p_value), direction]) + '\n')
@@ -645,9 +649,13 @@ def multiprocess(motifs, genome, output_directory, cleans, p_value, bed_dictiona
 
 	sorted_dict = sorted(dict_motifs_p_values.items(), key = lambda x : (x[1]['p_value']), reverse = False)
 
+	logger.info('The most enriched motifs are:')
+	logger.info("{:30s} | {:30s} | {:30s} | {:30s}".format('Motif', 'p_value', 'adjusted_p_value', 'direction'))
+	logger.info('-' * 120)
 	#for i in range(output_number):
 	for i in range(len(motifs_array)):
-		logger.info(sorted_dict[i])
+		#logger.info(sorted_dict[i])
+		logger.info("{:30s} | {:30s} | {:30s} | {:30s}".format(str(sorted_dict[i][0]), str(sorted_dict[i][1]['p_value']), str(sorted_dict[i][1]['adjusted_p_value']), str(sorted_dict[i][1]['direction'])))
 
 	logger.info('\n')
 
@@ -671,14 +679,58 @@ def multiprocess(motifs, genome, output_directory, cleans, p_value, bed_dictiona
 	plt.hist(all_differences, bins = 1500, color = 'g', normed=True)
 	xmin, xmax = plt.xlim()
 	x = np.linspace(xmin, xmax, 25000)
-	#p = stats.norm.pdf(x, mu, std)
-	p = stats.norm.pdf(x)
-	plt.plot(x, p, 'r', linewidth = 3)
-	title = "fit results: mu = %.4f, std = %.4f" % (mu, std)
+	p = stats.norm.pdf(x, mu, std)
+	#p = stats.norm.pdf(x)
+	plt.plot(x, p, 'r', linewidth = 1)
+	title = "All differences before normalization: mu = %.4f, std = %.4f" % (mu, std)
 	plt.title(title)
 	plt.grid()
 	plt.show()
 
+	"""
+	mu = np.mean(all_differences)
+	std = np.std(all_differences, ddof = 1) #ddof = 1 calculates corrected sample sd which is sqrt(N/(N-1)) times the population sd where N is the number of points, interpretes the data as samples, estimates true variance
+	#https://stackoverflow.com/questions/15389768/standard-deviation-of-a-list
+	plt.hist(all_differences, bins = 1500, color = 'g', normed=True)
+	xmin, xmax = plt.xlim()
+	x = np.linspace(xmin, xmax, 25000)
+	#p = stats.norm.pdf(x, mu, std)
+	p = stats.norm.pdf(x)
+	plt.plot(x, p, 'r', linewidth = 1)
+	title = "All differences before normalization: mu = %.4f, std = %.4f" % (mu, std)
+	plt.title(title)
+	plt.grid()
+	plt.show()
+	"""
+
+
+	mu_normalized = np.mean(all_differences_normalized)
+	std_normalized = np.std(all_differences_normalized, ddof = 1)
+	plt.hist(all_differences_normalized, bins = 1500, color = 'b', normed=True)
+	xmin, xmax = plt.xlim()
+	x_normalized = np.linspace(xmin, xmax, 25000)
+	p_normalized = stats.norm.pdf(x_normalized, mu_normalized, std_normalized)
+	#p = stats.norm.pdf(x)
+	plt.plot(x_normalized, p_normalized, 'r', linewidth = 1)
+	title_normalized = "All differences after normalization: mu = %.4f, std = %.4f" % (mu_normalized, std_normalized)
+	plt.title(title_normalized)
+	plt.grid()
+	plt.show()
+
+	mu_normalized = np.mean(all_differences_normalized)
+	std_normalized = np.std(all_differences_normalized, ddof = 1)
+	plt.hist(all_differences_normalized, bins = 1500, color = 'b', normed=True)
+	xmin, xmax = plt.xlim()
+	x_normalized = np.linspace(xmin, xmax, 25000)
+	#p_normalized = stats.norm.pdf(x_normalized, mu_normalized, std_normalized)
+	p = stats.norm.pdf(x)
+	plt.plot(x_normalized, p_normalized, 'r', linewidth = 1)
+	title_normalized = "All differences after normalization: mu = %.4f, std = %.4f" % (mu_normalized, std_normalized)
+	plt.title(title_normalized)
+	plt.grid()
+	plt.show()
+
+	"""
 	if mu != 0.0 and std != 1.0:
 		all_differences_corrected = (all_differences - mu ) / std
 
@@ -687,14 +739,14 @@ def multiprocess(motifs, genome, output_directory, cleans, p_value, bed_dictiona
 		plt.hist(all_differences_corrected, bins = 1500, color = 'b', normed=True)
 		xmin, xmax = plt.xlim()
 		x = np.linspace(xmin, xmax, 25000)
-		#p = stats.norm.pdf(x, mu, std)
-		p = stats.norm.pdf(x)
-		plt.plot(x, p, 'r', linewidth = 3)
+		p = stats.norm.pdf(x, mu, std)
+		#p = stats.norm.pdf(x)
+		plt.plot(x, p, 'r', linewidth = 1)
 		title = "corrected results: mu = %.4f, std = %.4f" % (mu_corrected, std_corrected)
 		plt.title(title)
 		plt.grid()
 		plt.show()
-
+	"""
 
 
 
