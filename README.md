@@ -1,8 +1,7 @@
 
 ![alt text](https://github.com/petrokvitka/WiNNie/blob/master/logo/winnie_logo_white_name.png)
 
-# WiNNie
-Weighted motif enrichment analysis using digital genomic footprinting scores. Here you can read more about 
+Weighted motif enrichment analysis 
 
 ## Getting started
 To set up WiNNie for a run, please make sure you have installed [CONDA](https://github.com/conda/conda). We are using a conda environment to install all needed dependencies.
