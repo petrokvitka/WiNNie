@@ -65,7 +65,8 @@ def parse_args():
 def check_directory(directory):
 	if not os.path.exists(directory):
 		os.makedirs(directory)
-		logger.info('a new directory ' + directory + ' was created')
+		#logger.info('a new directory ' + directory + ' was created')
+		print('a new directory ' + directory + ' was created')
 					
 #merge the whole genome with the regions mentioned in .bed file
 def merge(genome, bed_file, output_directory):	
@@ -614,21 +615,26 @@ def is_fasta(check_fasta):
 def check_existing_input_files(args):
 
 	if not is_fasta(args.genome):
-		logger.info('please make sure the input genome file has a fasta format')
+		#logger.info('please make sure the input genome file has a fasta format')
+		print('please make sure the input genome file has a fasta format')
 		sys.exit()
 	if not os.path.isfile(args.condition1) or not os.path.isfile(args.condition2):
-		logger.info('please make sure the both files with conditions to compare exist')
+		#logger.info('please make sure the both files with conditions to compare exist')
+		print('please make sure the both files with conditions to compare exist')
 		sys.exit()
 	if not args.condition1.endswith('.bw') or not args.condition2.endswith('.bw'):
-		logger.info('please check if the both conditions files are in bigWig format')
+		#logger.info('please check if the both conditions files are in bigWig format')
+		print('please check if the both conditions files are in bigWig format')
 		sys.exit()
 	#check if the file with motifs exists
 	if not os.path.isfile(args.motifs):
-		logger.info('there is no file with motifs, the exit is forced')
+		#logger.info('there is no file with motifs, the exit is forced')
+		print('there is no file with motifs, the exit is forced')
 		sys.exit()
 	#check if the bed file exists
 	if not os.path.isfile(args.bed_file):
-		logger.info('there is no such bed file ' + args.bed_file + ', the exit is forced')
+		#logger.info('there is no such bed file ' + args.bed_file + ', the exit is forced')
+		print('there is no such bed file ' + args.bed_file + ', the exit is forced')
 		sys.exit()
 
 def make_bed_dictionary(bed_file):
