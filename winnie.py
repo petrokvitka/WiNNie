@@ -529,12 +529,6 @@ def multiprocess(motifs, genome, output_directory, cleans, p_value, bed_dictiona
 
 	logger.info('\n')
 
-	for motif in sorted_dict:
-		if str(motif[0]).startswith("DUX") or str(motif[0]).startswith("Dux"):
-			logger.info(motif)
-
-	logger.info('\n')
-
 	max_pvalues_array = max(p_values_array)
 
 	logger.info("the greatest pvalue is " + str(max_pvalues_array))
