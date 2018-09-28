@@ -598,7 +598,8 @@ def compute_differences(bed_dictionary, condition1, condition2):
 
 def is_fasta(check_fasta):
 	if not os.path.isfile(check_fasta):
-		logger.info('there is no file with genome, the exit is forced')
+		#logger.info('there is no file with genome, the exit is forced')
+		print('there is no file with genome, the exit is forced')
 		sys.exit()
 	else:
 		# modified code from https://stackoverflow.com/questions/44293407/how-can-i-check-whether-a-given-file-is-fasta
